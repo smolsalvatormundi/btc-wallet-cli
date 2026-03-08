@@ -1,0 +1,13 @@
+{
+  "name": "rare-sat-wallet-cli",
+  "version": "1.0.0",
+  "description": "CLI for Bitcoin wallet with rare sat extraction",
+  "main": "src/cli.js",
+  "bin": {
+    "btc-wallet": "src/cli.js"
+  },
+  "dependencies": {
+    "bitcoinjs-lib": "^6.1.0",
+    "tiny-secp256k1": "^2.0.0"
+  }
+}

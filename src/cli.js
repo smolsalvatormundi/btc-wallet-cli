@@ -222,7 +222,7 @@ function deriveFromDescriptor(desc, index = 0) {
   
   // Detect key type and use appropriate versions
   let versions = VERSIONS.xpub;  // default
-  console.log("DEBUG2: key starts with:", key.substring(0, 10));
+  
   if (key.startsWith('tpub')) { versions = VERSIONS.tpub;  }
   else if (key.startsWith('zpub')) versions = VERSIONS.zpub;
   else if (key.startsWith('ypub')) versions = VERSIONS.ypub;
@@ -480,6 +480,25 @@ async function main() {
     else if (pwd) { wallet = loadWallet(pwd); if (wallet) { unlocked = true; console.log('✅ Unlocked with --password'); } }
   }
   
+  // If --testnet flag is provided, override network and re-derive address
+  if (wallet && testnet && wallet.network !== 'testnet') {
+    console.log("⚠️ Switching to testnet...");
+    // Re-derive address for testnet using same private key
+    const { payments, initEccLib, networks } = require('bitcoinjs-lib');
+    const tinysecp256k1 = require('tiny-secp256k1');
+    initEccLib(tinysecp256k1);
+    const { HDKey } = require('@scure/bip32');
+    const bip39 = require('bip39');
+    const seed = bip39.mnemonicToSeedSync(wallet.mnemonic);
+    const root = HDKey.fromMasterSeed(seed);
+    // Derive for testnet: m/86'/1'/0'/0/0
+    const child = root.derive("m/86'/1'/0'/0/0");
+    wallet.publicKey = child.publicKey;
+    wallet.address = payments.p2tr({ internalPubkey: wallet.publicKey.slice(1, 33), network: networks.testnet }).address;
+    wallet.network = 'testnet';
+    currentNet = 'testnet';
+  }
+  
   if (wallet) console.log(`📍 Wallet: ${wallet.address} (${wallet.network || currentNet})\n`);
   else if (meta.exists && meta.encrypted) console.log(`📍 Encrypted: ${meta.address}\n   Use --password or "unlock"\n`);
   
@@ -727,11 +746,14 @@ async function main() {
     
     // PSBT commands
     case 'sign-psbt': {
+      console.log("DEBUG: args =", args);
       const chk = checkReady();
       if (!chk.ready) { console.log('❌ Wallet locked. Use --password or "unlock"\n'); process.exit(1); }
       if (!wallet) { console.log('❌ No wallet\n'); process.exit(1); }
       
-      const psbtInput = args[1];
+      // args: ['node', 'cli.js', 'sign-psbt', 'file.psbt'] or ['--testnet', 'sign-psbt', 'file.psbt']
+      // Find the first arg that is not a flag and not the command
+      const psbtInput = args.find((a, i) => i > 0 && !a.startsWith('--') && a !== 'sign-psbt' && !a.startsWith('-'));
       if (!psbtInput) { console.log('Usage: sign-psbt <psbt-base64-or-file> [--output <file>]\n'); process.exit(1); }
       
       let psbtData = psbtInput;
