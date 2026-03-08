@@ -454,7 +454,7 @@ async function selectUTXOs(utxos) {
 
 async function main() {
   let args = process.argv.slice(2);
-  console.log('\n🪙 Rare Sat Wallet CLI\n');
+  console.log('\n🪙 Smol BTC Wallet\n');
   
   const meta = getMeta();
   const testnet = args.includes('--testnet');
@@ -830,33 +830,33 @@ async function main() {
     
     default:
       console.log(`
-🪙 Rare Sat Wallet CLI
+🪙 Smol BTC Wallet
 
 Commands:
   new                   Generate wallet
-  import <mnemonic>     Import wallet
+  import <mnemonic>    Import wallet
   address               Show address
   balance               Show balance
   utxos [--sats]       List UTXOs
-  send [opts]         Send BTC (--exclude-rare, --exclude-ordinals)
+  send [opts]          Send BTC (--exclude-rare, --exclude-ordinals)
   clear                 Delete wallet
 
 Encryption:
   set-password          Encrypt wallet
-  unlock <pwd>         Decrypt wallet
+  unlock <pwd>          Decrypt wallet
   lock                  Lock wallet
   change-password       Change password
   lock-status           Show status
 
 Descriptors (BIP 389):
-  import-descriptor <d>   Import descriptor string or file
-  import-sparrow <file>   Import Sparrow export
-  descriptors             List descriptors
-  clear-descriptors       Clear all
+  import-descriptor <d>  Import descriptor string or file
+  import-sparrow <file>  Import Sparrow export
+  descriptors            List descriptors
+  clear-descriptors      Clear all
 
 PSBT:
-  sign-psbt <psbt>       Sign PSBT (auto-detects base64/binary)
-  decode-psbt <psbt>     Decode PSBT
+  sign-psbt <psbt>      Sign PSBT (auto-detects base64/binary)
+  decode-psbt <psbt>   Decode PSBT
 
 Options:
   --testnet
