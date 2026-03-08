@@ -889,20 +889,20 @@ async function main() {
 🪙 Smol BTC Wallet
 
 Commands:
-  new                   Generate wallet
-  import <mnemonic>    Import wallet
-  address               Show address
-  balance               Show balance
-  utxos [--sats]       List UTXOs
-  send [opts]          Send BTC (--exclude-rare, --exclude-ordinals)
-  clear                 Delete wallet
+  new                    Generate wallet
+  import <mnemonic>      Import wallet
+  address                Show address
+  balance                Show balance
+  utxos [--sats]        List UTXOs
+  send [opts]            Send BTC (--exclude-rare, --exclude-ordinals)
+  clear                  Delete wallet
 
 Encryption:
-  set-password          Encrypt wallet
-  unlock <pwd>          Decrypt wallet
-  lock                  Lock wallet
-  change-password       Change password
-  lock-status           Show status
+  set-password           Encrypt wallet
+  unlock <pwd>           Decrypt wallet
+  lock                   Lock wallet
+  change-password        Change password
+  lock-status            Show status
 
 Descriptors (BIP 389):
   import-descriptor <d>  Import descriptor string or file
@@ -911,9 +911,9 @@ Descriptors (BIP 389):
   clear-descriptors      Clear all
 
 PSBT:
-  sign-psbt <psbt>      Sign PSBT (auto-detects base64/binary)
-  decode-psbt <psbt>   Decode PSBT
-  broadcast <psbt>     Broadcast signed PSBT
+  sign-psbt <psbt>       Sign PSBT (auto-detects base64/binary)
+  decode-psbt <psbt>    Decode PSBT
+  broadcast <psbt>        Broadcast signed PSBT
 
 Options:
   --testnet
