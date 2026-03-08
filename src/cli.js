@@ -314,23 +314,10 @@ function loadDescriptors() {
 // ============================================================
 
 function signPsbtWithTaproot(psbt, privateKey, internalPubkey) {
-  // BIP386: Tweak = H_TapTweak(pubkey) where pubkey is full 33-byte (with parity)
-  // We need to reconstruct the full pubkey from x-only + derive parity
-  // Actually for BIP386 signing, we need internalPrivKey (untweaked) + compute tweak properly
+  // Use bitcoinjs-lib v7 API: signTaprootInput with ECPair
+  const { ECPairFactory } = require('ecpair');
+  const ECPair = ECPairFactory(tinysecp256k1);
   
-  // For BIP386: tweakedPrivKey = privKey + H_TapTweak(pubkey) mod n
-  // The pubkey for tweak is: 0x02 || x if y is even, 0x03 || x if y is odd
-  // We can get parity from the witnessUtxo's scriptPubKey or derive from private key
-  
-  // Simpler approach: use untweaked key for signing (BIP86 internal key)
-  // BIP86 doesn't use tweaking for the internal key - it's the direct derivation
-  const privKeyNum = BigInt('0x' + privateKey.toString('hex'));
-  const n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
-  
-  // For BIP86: sign directly with the derived private key (no tweak needed for m/86'/0'/0'/0/0)
-  // The tweak is only needed for keys in the scripts path
-  
-  // Sign each input
   let signedCount = 0;
   for (let i = 0; i < psbt.data.inputs.length; i++) {
     const input = psbt.data.inputs[i];
@@ -341,12 +328,12 @@ function signPsbtWithTaproot(psbt, privateKey, internalPubkey) {
     if (!script || script[0] !== 0x51 || script[1] !== 0x20) continue;
     
     try {
-      const hash = psbt.hashForTaprootSignature(i, script, undefined, 0);
-      const sig = tinysecp256k1.signSchnorr(hash, privateKey);
-      input.tapKeySig = sig;
+      // Create keyPair from private key using ECPair
+      const keyPair = ECPair.fromPrivateKey(privateKey);
+      psbt.signTaprootInput(i, keyPair);
       signedCount++;
     } catch (e) {
-      // Can't sign this input
+      console.log(`  ⚠️ Could not sign input ${i}: ${e.message}`);
     }
   }
   
