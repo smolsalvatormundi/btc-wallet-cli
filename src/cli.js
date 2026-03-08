@@ -899,8 +899,8 @@ Descriptors (BIP 389):
 
 PSBT:
   sign-psbt <psbt>       Sign PSBT (auto-detects base64/binary)
-  decode-psbt <psbt>    Decode PSBT
-  broadcast <psbt>        Broadcast signed PSBT
+  decode-psbt <psbt>     Decode PSBT
+  broadcast <psbt>       Broadcast signed PSBT
 
 Options:
   --testnet
