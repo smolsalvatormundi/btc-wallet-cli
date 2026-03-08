@@ -463,7 +463,7 @@ async function main() {
   const apiKey = process.env.ORDISCAN_API_KEY || '';
   
   // Find the first argument that is a known command (not an option)
-  const knownCommands = ['new', 'import', 'address', 'balance', 'utxos', 'send', 'clear', 'set-password', 'unlock', 'lock', 'change-password', 'lock-status', 'import-descriptor', 'import-sparrow', 'descriptors', 'clear-descriptors', 'sign-psbt', 'decode-psbt', 'help'];
+  const knownCommands = ['new', 'import', 'address', 'balance', 'utxos', 'send', 'clear', 'set-password', 'unlock', 'lock', 'change-password', 'lock-status', 'import-descriptor', 'import-sparrow', 'descriptors', 'clear-descriptors', 'sign-psbt', 'decode-psbt', 'broadcast', 'help'];
   let cmd = null;
   for (const a of args) {
     if (knownCommands.includes(a)) {
@@ -480,10 +480,10 @@ async function main() {
     else if (pwd) { wallet = loadWallet(pwd); if (wallet) { unlocked = true; console.log('✅ Unlocked with --password'); } }
   }
   
-  // If --testnet flag is provided, override network and re-derive address
+  // If --testnet flag is provided, override network and re-derive address + private key
   if (wallet && testnet && wallet.network !== 'testnet') {
     console.log("⚠️ Switching to testnet...");
-    // Re-derive address for testnet using same private key
+    // Re-derive address for testnet using same mnemonic
     const { payments, initEccLib, networks } = require('bitcoinjs-lib');
     const tinysecp256k1 = require('tiny-secp256k1');
     initEccLib(tinysecp256k1);
@@ -494,6 +494,7 @@ async function main() {
     // Derive for testnet: m/86'/1'/0'/0/0
     const child = root.derive("m/86'/1'/0'/0/0");
     wallet.publicKey = child.publicKey;
+    wallet.privateKey = Buffer.from(child.privateKey);  // Convert Uint8Array to Buffer
     wallet.address = payments.p2tr({ internalPubkey: wallet.publicKey.slice(1, 33), network: networks.testnet }).address;
     wallet.network = 'testnet';
     currentNet = 'testnet';
@@ -828,6 +829,61 @@ async function main() {
       break;
     }
     
+    case 'broadcast': {
+      const psbtInput = args.find((a, i) => i > 0 && !a.startsWith('--') && a !== 'broadcast');
+      if (!psbtInput) { console.log('Usage: broadcast <psbt-base64-or-file>\n'); process.exit(1); }
+      
+      let psbtData = psbtInput;
+      if (fs.existsSync(psbtInput)) {
+        psbtData = fs.readFileSync(psbtInput, 'utf8').trim();
+      }
+      
+      let psbt;
+      try { psbt = Psbt.fromBase64(psbtData); }
+      catch { console.log('Could not parse PSBT.\n'); process.exit(1); }
+      
+      // Extract tx hex from PSBT - check if signed and try to extract
+      let txHex;
+      try {
+        // Check if there's a tapKeySig - if so, we can extract directly
+        const hasTapKeySig = psbt.data.inputs.some(i => i.tapKeySig);
+        if (hasTapKeySig) {
+          // For BIP86 taproot, just extract the tx
+          txHex = psbt.extractTransaction().toHex();
+        } else {
+          psbt.finalizeAllInputs();
+          txHex = psbt.extractTransaction().toHex();
+        }
+      } catch (e) {
+        console.log(`❌ PSBT not ready: ${e.message}\n`);
+        process.exit(1);
+      }
+      
+      console.log(`\n📡 Broadcasting to ${testnet ? 'testnet' : 'mainnet'}...\n`);
+      
+      try {
+        const baseUrl = testnet ? 'https://mempool.space/testnet/api' : 'https://mempool.space/api';
+        const response = await fetch(`${baseUrl}/tx`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: txHex
+        });
+        
+        if (response.ok) {
+          const txid = await response.text();
+          console.log(`✅ Broadcast successful!`);
+          console.log(`   TXID: ${txid}`);
+          console.log(`   ${testnet ? 'https://mempool.space/testnet/tx/' : 'https://mempool.space/tx/'}${txid}\n`);
+        } else {
+          const error = await response.text();
+          console.log(`❌ Broadcast failed: ${error}\n`);
+        }
+      } catch (e) {
+        console.log(`❌ Error: ${e.message}\n`);
+      }
+      break;
+    }
+    
     default:
       console.log(`
 🪙 Smol BTC Wallet
@@ -857,6 +913,7 @@ Descriptors (BIP 389):
 PSBT:
   sign-psbt <psbt>      Sign PSBT (auto-detects base64/binary)
   decode-psbt <psbt>   Decode PSBT
+  broadcast <psbt>     Broadcast signed PSBT
 
 Options:
   --testnet
