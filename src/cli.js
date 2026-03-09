@@ -10,6 +10,30 @@ const { payments, initEccLib, Psbt, networks } = require('bitcoinjs-lib');
 const tinysecp256k1 = require('tiny-secp256k1');
 const readline = require('readline');
 
+// Auto-apply bitcoinjs-lib Taproot BIP86 patch if not already applied
+function applyBitcoinjsPatch() {
+  const psbtPath = path.join(__dirname, '..', 'node_modules', 'bitcoinjs-lib', 'src', 'cjs', 'psbt.cjs');
+  if (!fs.existsSync(psbtPath)) return;
+  
+  const content = fs.readFileSync(psbtPath, 'utf8');
+  if (content.includes('FIX: tapInternalKey')) return; // Already patched
+  
+  const patch = `function getPrevoutTaprootKey(inputIndex, input, cache) {
+  // FIX: tapInternalKey
+  if (input.tapInternalKey) return input.tapInternalKey;`;
+  
+  const newContent = content.replace(
+    'function getPrevoutTaprootKey(inputIndex, input, cache) {',
+    patch
+  );
+  
+  if (newContent !== content) {
+    fs.writeFileSync(psbtPath, newContent);
+    console.log('⚡ Applied bitcoinjs-lib Taproot patch');
+  }
+}
+applyBitcoinjsPatch();
+
 // Initialize ECC
 initEccLib(tinysecp256k1);
 
