@@ -328,17 +328,34 @@ function signPsbtWithTaproot(psbt, privateKey, internalPubkey) {
     if (!script || script[0] !== 0x51 || script[1] !== 0x20) continue;
     
     try {
+      // Fix: If witnessUtxo.script key doesn't match tapInternalKey, 
+      // create new witnessUtxo with correct key (workaround for broken PSBTs)
+      const scriptKey = Buffer.from(script).slice(2); // x-only from script
+      const tapKey = input.tapInternalKey ? Buffer.from(input.tapInternalKey) : null;
+      
+      if (tapKey && scriptKey.toString('hex') !== tapKey.toString('hex')) {
+        console.log('  ⚠️ Input ' + i + ': witnessUtxo key mismatch, fixing...');
+        // Reconstruct witnessUtxo with correct tapInternalKey
+        input.witnessUtxo = {
+          script: Buffer.concat([Buffer.from([0x51, 0x20]), tapKey]),
+          value: input.witnessUtxo.value
+        };
+      }
+      
       // Create keyPair from private key using ECPair
       const keyPair = ECPair.fromPrivateKey(privateKey);
       psbt.signTaprootInput(i, keyPair);
       signedCount++;
     } catch (e) {
-      console.log(`  ⚠️ Could not sign input ${i}: ${e.message}`);
+      console.log('  ⚠️ Could not sign input ' + i + ': ' + e.message);
     }
   }
   
   if (signedCount > 0) {
-    psbt.finalizeAllInputs();
+    // Taproot inputs need finalizeInput, not finalizeAllInputs
+    for (let i = 0; i < psbt.data.inputs.length; i++) {
+      try { psbt.finalizeInput(i); } catch { /* ignore */ }
+    }
   }
   
   return psbt;
@@ -505,7 +522,8 @@ async function main() {
     }
     
     case 'import': {
-      const m = args.slice(1).join(' ');
+      // Filter out flags from args
+      const m = args.slice(1).filter(a => !a.startsWith('--')).join(' ');
       if (!m) { console.log('Usage: import <mnemonic>'); process.exit(1); }
       const w = createWallet(m, testnet ? 'testnet' : 'mainnet');
       console.log(`✅ Imported!\n📍 ${w.address}\n`);
@@ -832,10 +850,10 @@ async function main() {
       // Extract tx hex from PSBT - check if signed and try to extract
       let txHex;
       try {
-        // Check if there's a tapKeySig - if so, we can extract directly
-        const hasTapKeySig = psbt.data.inputs.some(i => i.tapKeySig);
-        if (hasTapKeySig) {
-          // For BIP86 taproot, just extract the tx
+        // Check if there's a finalScriptWitness - if so, we can extract directly
+        const hasFinalWitness = psbt.data.inputs.some(i => i.finalScriptWitness);
+        if (hasFinalWitness) {
+          // Already signed and finalized, just extract
           txHex = psbt.extractTransaction().toHex();
         } else {
           psbt.finalizeAllInputs();
@@ -894,8 +912,9 @@ Encryption:
 Descriptors (BIP 389):
   import-descriptor <d>  Import descriptor string or file
   import-sparrow <file>  Import Sparrow export
-  descriptors            List descriptors
-  clear-descriptors      Clear all
+
+Sparrow Signing:
+  import-sparrow-key <xprv>  Import Sparrow xprv/tprv to sign Sparrow PSBTs
 
 PSBT:
   sign-psbt <psbt>       Sign PSBT (auto-detects base64/binary)
